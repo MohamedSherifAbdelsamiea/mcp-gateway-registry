@@ -454,13 +454,18 @@ async def toggle_service(
 async def register_service(
     server_name: str = Field(..., description="Display name for the server."),
     path: str = Field(..., description="Unique URL path prefix for the server (e.g., '/my-service'). Must start with '/'."),
-    proxy_pass_url: str = Field(..., description="The internal URL where the actual MCP server is running (e.g., 'http://localhost:8001')."),
+    proxy_pass_url: Optional[str] = Field(None, description="The internal URL where the actual MCP server is running (e.g., 'http://localhost:8001'). Not required when using command."),
     description: Optional[str] = Field("", description="Description of the server."),
     tags: Optional[List[str]] = Field(None, description="Optional list of tags for categorization."),
     num_tools: Optional[int] = Field(0, description="Number of tools provided by the server."),
     num_stars: Optional[int] = Field(0, description="Number of stars/rating for the server."),
     is_python: Optional[bool] = Field(False, description="Whether the server is implemented in Python."),
     license: Optional[str] = Field("N/A", description="License information for the server."),
+    command: Optional[str] = Field(None, description="Command to run the server (e.g., 'uvx'). Used as an alternative to proxy_pass_url."),
+    args: Optional[List[str]] = Field(None, description="Arguments to pass to the command (e.g., ['awslabs.aws-documentation-mcp-server@latest'])."),
+    env: Optional[Dict[str, str]] = Field(None, description="Environment variables to set for the command."),
+    disabled: Optional[bool] = Field(False, description="Whether the server should be disabled by default."),
+    autoApprove: Optional[List[str]] = Field(None, description="List of patterns for auto-approving requests."),
     username: str = Field(..., description="Username for registry authentication"),
     password: str = Field(..., description="Password for registry authentication")
 ) -> Dict[str, Any]:
@@ -470,13 +475,18 @@ async def register_service(
     Args:
         server_name: Display name for the server.
         path: Unique URL path prefix for the server (e.g., '/my-service'). Must start with '/'.
-        proxy_pass_url: The internal URL where the actual MCP server is running (e.g., 'http://localhost:8001').
+        proxy_pass_url: The internal URL where the actual MCP server is running (e.g., 'http://localhost:8001'). Not required when using command.
         description: Description of the server.
         tags: Optional list of tags for categorization.
         num_tools: Number of tools provided by the server.
         num_stars: Number of stars/rating for the server.
         is_python: Whether the server is implemented in Python.
         license: License information for the server.
+        command: Command to run the server (e.g., 'uvx'). Used as an alternative to proxy_pass_url.
+        args: Arguments to pass to the command (e.g., ['awslabs.aws-documentation-mcp-server@latest']).
+        env: Environment variables to set for the command.
+        disabled: Whether the server should be disabled by default.
+        autoApprove: List of patterns for auto-approving requests.
         username: Username for registry authentication.
         password: Password for registry authentication.
         
@@ -497,7 +507,6 @@ async def register_service(
     form_data = {
         "name": server_name,  # Use 'name' as expected by the registry API
         "path": path,
-        "proxy_pass_url": proxy_pass_url,
         "description": description if description is not None else "",
         "tags": tags_str if tags_str is not None else "",
         "num_tools": num_tools,
@@ -505,6 +514,28 @@ async def register_service(
         "is_python": is_python,
         "license": license  # The registry API uses alias="license" for license_str
     }
+    
+    # Add proxy_pass_url if provided
+    if proxy_pass_url is not None:
+        form_data["proxy_pass_url"] = proxy_pass_url
+    
+    # Add UVX configuration if command is provided
+    if command is not None:
+        # Create a nested mcpServers configuration
+        mcp_config = {
+            "mcpServers": {
+                f"{server_name.lower().replace(' ', '-')}": {
+                    "command": command,
+                    "args": args if args is not None else [],
+                    "env": env if env is not None else {},
+                    "disabled": disabled,
+                    "autoApprove": autoApprove if autoApprove is not None else []
+                }
+            }
+        }
+        # Add the UVX configuration as a JSON string in the form data
+        form_data["mcp_config"] = json.dumps(mcp_config)
+    
     # Remove None values
     form_data = {k: v for k, v in form_data.items() if v is not None}
     

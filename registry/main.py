@@ -1385,12 +1385,13 @@ async def register_service(
     name: Annotated[str, Form()],
     description: Annotated[str, Form()],
     path: Annotated[str, Form()],
-    proxy_pass_url: Annotated[str, Form()],
+    proxy_pass_url: Annotated[str, Form()] = None,
     tags: Annotated[str, Form()] = "",
     num_tools: Annotated[int, Form()] = 0,
     num_stars: Annotated[int, Form()] = 0,
     is_python: Annotated[bool, Form()] = False,
     license_str: Annotated[str, Form(alias="license")] = "N/A",
+    mcp_config: Annotated[str, Form()] = None,
     username: Annotated[str, Depends(api_auth)] = None,
 ):
     logger.info("[DEBUG] register_service() called with parameters:")
@@ -1403,6 +1404,7 @@ async def register_service(
     logger.info(f"[DEBUG] - num_stars: {num_stars}")
     logger.info(f"[DEBUG] - is_python: {is_python}")
     logger.info(f"[DEBUG] - license_str: {license_str}")
+    logger.info(f"[DEBUG] - mcp_config: {mcp_config}")
     logger.info(f"[DEBUG] - username: {username}")
 
     # Ensure path starts with a slash
@@ -1427,7 +1429,6 @@ async def register_service(
         "server_name": name,
         "description": description,
         "path": path,
-        "proxy_pass_url": proxy_pass_url,
         "tags": tag_list,
         "num_tools": num_tools,
         "num_stars": num_stars,
@@ -1435,6 +1436,24 @@ async def register_service(
         "license": license_str,
         "tool_list": [] # Initialize tool list
     }
+    
+    # Add proxy_pass_url if provided
+    if proxy_pass_url:
+        server_entry["proxy_pass_url"] = proxy_pass_url
+        
+    # Add mcp_config if provided
+    if mcp_config:
+        try:
+            mcp_config_json = json.loads(mcp_config)
+            server_entry["mcp_config"] = mcp_config_json
+            logger.info(f"[DEBUG] Added mcp_config to server entry: {json.dumps(mcp_config_json, indent=2)}")
+        except json.JSONDecodeError as e:
+            logger.error(f"[ERROR] Failed to parse mcp_config JSON: {e}")
+            return JSONResponse(
+                status_code=400, 
+                content={"error": f"Invalid mcp_config JSON format: {str(e)}"}
+            )
+    
     logger.info(f"[DEBUG] Created server entry: {json.dumps(server_entry, indent=2)}")
 
     # Save to individual file

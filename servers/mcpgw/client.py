@@ -104,13 +104,17 @@ async def run(server_url, args):
                     # Pass hardcoded parameters to the register_service tool
                     result = await session.call_tool(
                         "register_service", arguments={
-                            "server_name": "Example Service",
-                            "path": "/example-service",
-                            "proxy_pass_url": "http://localhost:9000",
-                            "description": "An example MCP service for demonstration purposes",
-                            "tags": ["example", "demo", "test"],
-                            "num_tools": 3,
-                            "num_stars": 5,
+                            "server_name": "AWS Documentation MCP Server",
+                            "path": "/aws-docs",
+                            "description": "AWS Documentation server providing access to AWS documentation and resources",
+                            "tags": ["aws", "documentation", "cloud"],
+                            "command": "uvx",
+                            "args": ["awslabs.aws-documentation-mcp-server@latest"],
+                            "env": {
+                                "FASTMCP_LOG_LEVEL": "ERROR"
+                            },
+                            "disabled": False,
+                            "autoApprove": [],
                             "is_python": True,
                             "license": "MIT",
                             "username": args.username,
