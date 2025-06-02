@@ -661,6 +661,73 @@ async def healthcheck() -> Dict[str, Any]:
 
 
 @mcp.tool()
+async def execute_remote_tool(
+    service_path: str = Field(..., description="The path of the MCP server providing the tool (e.g., '/fininfo')."),
+    tool_name: str = Field(..., description="The name of the tool to execute."),
+    tool_args: Dict[str, Any] = Field({}, description="Arguments to pass to the tool as a dictionary."),
+    username: str = Field(..., description="Username for registry authentication"),
+    password: str = Field(..., description="Password for registry authentication")
+) -> Dict[str, Any]:
+    """
+    Executes a tool on a remote MCP server.
+    
+    Args:
+        service_path: The path of the MCP server providing the tool (e.g., '/fininfo').
+        tool_name: The name of the tool to execute.
+        tool_args: Arguments to pass to the tool as a dictionary.
+        username: Username for registry authentication.
+        password: Password for registry authentication.
+        
+    Returns:
+        Dict[str, Any]: The result from executing the tool.
+        
+    Raises:
+        Exception: If the tool execution fails or the server cannot be reached.
+    """
+    # Get server details to find the URL
+    server_details = await get_server_details(service_path, username, password)
+    
+    if not server_details or "proxy_pass_url" not in server_details:
+        raise Exception(f"Could not find server at {service_path} or missing proxy_pass_url.")
+    
+    proxy_pass_url = server_details["proxy_pass_url"]
+    if not proxy_pass_url:
+        raise Exception(f"Server {service_path} has no proxy_pass_url configured.")
+    
+    # Construct the SSE URL for the MCP server
+    sse_url = proxy_pass_url.rstrip('/') + "/sse"
+    
+    logger.info(f"Connecting to MCP server at {sse_url} to execute tool {tool_name}")
+    
+    try:
+        # Connect using the sse_client context manager
+        async with sse_client(sse_url) as (read, write):
+            # Use the ClientSession context manager
+            async with ClientSession(read, write, sampling_callback=None) as session:
+                # Initialize the session
+                await asyncio.wait_for(session.initialize(), timeout=10.0)
+                
+                # Call the tool with the provided arguments
+                result = await asyncio.wait_for(
+                    session.call_tool(tool_name, arguments=tool_args),
+                    timeout=30.0
+                )
+                
+                # Process the result
+                response = {}
+                if hasattr(result, 'content'):
+                    response["content"] = [item.text for item in result.content if hasattr(item, 'text')]
+                
+                return response
+                
+    except asyncio.TimeoutError:
+        raise Exception(f"Timeout while executing tool {tool_name} on server {service_path}")
+    except Exception as e:
+        logger.error(f"Error executing remote tool {tool_name} on {service_path}: {e}", exc_info=True)
+        raise Exception(f"Failed to execute tool {tool_name}: {str(e)}")
+
+
+@mcp.tool()
 async def intelligent_tool_finder(
     natural_language_query: str = Field(..., description="Your query in natural language describing the task you want to perform."),
     username: str = Field(..., description="Username for mcpgw server authentication (if configured for this tool). Currently informational."),
