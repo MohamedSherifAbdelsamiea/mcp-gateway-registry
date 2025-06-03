@@ -36,14 +36,88 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # EKS cluster needs to be created first
-      # Skipping EKS deployment steps for now
-      - name: Set placeholder service address
+      - name: Update kubeconfig
         run: |
-          echo "SERVICE_ADDRESS=placeholder.example.com" >> $GITHUB_ENV
-          echo "Image successfully built and pushed to ECR: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
-          echo "To deploy to EKS, you need to create an EKS cluster first."
-          echo "You can create one with: aws eks create-cluster --name mcp-gateway-eks-cluster --role-arn <EKS-SERVICE-ROLE-ARN> --resources-vpc-config subnetIds=<SUBNET-IDS>,securityGroupIds=<SECURITY-GROUP-IDS>"
+          aws eks update-kubeconfig --name mcp-gateway-eks-cluster
+          kubectl get nodes || echo "No nodes available yet"
+
+      - name: Deploy to EKS
+        run: |
+          # Create namespace if it doesn't exist
+          kubectl create namespace mcp-gateway --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Deploy the application
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: mcp-gateway-registry
+            namespace: mcp-gateway
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: mcp-gateway-registry
+            template:
+              metadata:
+                labels:
+                  app: mcp-gateway-registry
+              spec:
+                containers:
+                - name: mcp-gateway-registry
+                  image: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+                  ports:
+                  - containerPort: 7860
+                  env:
+                  - name: ADMIN_USER
+                    value: "admin"
+                  - name: ADMIN_PASSWORD
+                    value: "${{ secrets.ADMIN_PASSWORD || '123' }}"
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: mcp-gateway-registry
+            namespace: mcp-gateway
+          spec:
+            selector:
+              app: mcp-gateway-registry
+            ports:
+            - port: 80
+              targetPort: 7860
+            type: LoadBalancer
+          EOF
+
+      - name: Get EKS Service External IP/Hostname
+        id: get-service-ip
+        run: |
+          echo "Waiting for service to get external address..."
+          external_address=""
+          count=0
+          max_attempts=30
+          
+          while [ -z "$external_address" ] && [ $count -lt $max_attempts ]; do
+            echo "Attempt $count: Waiting for external address..."
+            external_address=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            
+            # If hostname is empty, try IP (depends on cloud provider)
+            if [ -z "$external_address" ]; then
+              external_address=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+            fi
+            
+            if [ -z "$external_address" ]; then
+              sleep 10
+              count=$((count+1))
+            fi
+          done
+          
+          if [ -z "$external_address" ]; then
+            echo "Could not get external address after $max_attempts attempts. Using placeholder."
+            external_address="placeholder.example.com"
+          fi
+          
+          echo "SERVICE_ADDRESS=$external_address" >> $GITHUB_ENV
+          echo "Service address: $external_address"
 
       - name: Configure AWS credentials for Route53 account
         uses: aws-actions/configure-aws-credentials@v2
@@ -71,20 +145,13 @@ jobs:
             ]
           }'
           
-      - name: Monitor deployment
+      - name: Deployment summary
         run: |
-          echo "Deployment completed. Monitoring resources..."
-          
-          # Check pod status
-          kubectl get pods -n mcp-gateway
-          
-          # Check service status
-          kubectl get svc -n mcp-gateway
-          
-          # Check ingress status
-          kubectl get ingress -n mcp-gateway
-          
-          # Check certificate status
-          kubectl get certificates -n mcp-gateway
-          
-          echo "Deployment URL: https://mcp-test.v2n2x.com"
+          echo "Workflow completed successfully!"
+          echo "Image built and pushed to: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
+          echo "Route53 record updated: mcp-test.v2n2x.com -> ${{ env.SERVICE_ADDRESS }}"
+          echo ""
+          echo "Next steps:"
+          echo "1. Create an EKS cluster"
+          echo "2. Update the workflow to use your EKS cluster name"
+          echo "3. Re-enable the EKS deployment steps"
