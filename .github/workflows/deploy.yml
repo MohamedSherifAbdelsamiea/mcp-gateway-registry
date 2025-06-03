@@ -26,17 +26,13 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Create ECR repository if it doesn't exist
-        run: |
-          aws ecr describe-repositories --repository-names mcp-gateway-registry || aws ecr create-repository --repository-name mcp-gateway-registry
-        continue-on-error: true
-
       - name: Build and push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: mcp-gateway-registry
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          # Repository already created manually: 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
