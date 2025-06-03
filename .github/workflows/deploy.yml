@@ -36,87 +36,14 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Update kubeconfig
-        run: aws eks update-kubeconfig --name mcp-gateway-eks-cluster
-
-      - name: Install Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: 'v3.10.0'
-
-      - name: Clone Distributed Training and Inference on EKS repo
+      # EKS cluster needs to be created first
+      # Skipping EKS deployment steps for now
+      - name: Set placeholder service address
         run: |
-          git clone https://github.com/aws-samples/distributed-training-and-inference-on-eks.git
-          cd distributed-training-and-inference-on-eks
-
-      - name: Install cert-manager
-        run: |
-          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
-          
-          # Wait for cert-manager to be ready
-          kubectl wait --for=condition=available --timeout=300s deployment/cert-manager-webhook -n cert-manager
-          
-          # Create ClusterIssuer for Let's Encrypt
-          cat <<EOF | kubectl apply -f -
-          apiVersion: cert-manager.io/v1
-          kind: ClusterIssuer
-          metadata:
-            name: letsencrypt-prod
-          spec:
-            acme:
-              server: https://acme-v02.api.letsencrypt.org/directory
-              email: your-email@example.com
-              privateKeySecretRef:
-                name: letsencrypt-prod
-              solvers:
-              - http01:
-                  ingress:
-                    class: nginx
-          EOF
-
-      - name: Deploy using Helm chart
-        run: |
-          cd distributed-training-and-inference-on-eks
-          
-          # Install/upgrade the Helm chart
-          helm install --debug mcp-gateway-registry \
-            charts/machine-learning/serving/generic-server \
-            -f examples/agentic/mcp-gateway-registry/server.yaml \
-            --set="image.repository=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY" \
-            --set="image.tag=${{ github.sha }}" \
-            --set="admin_user=admin" \
-            --set="admin_password=${{ secrets.ADMIN_PASSWORD || '123' }}" \
-            --set="polygon_api_key=${{ secrets.POLYGON_API_KEY || 'EkzPR2VJ_3lSH1xloFBv4cDZJUGMpMLn' }}" \
-            --set="ssl_enabled=true" \
-            --set="ssl_certs=/etc/ssl/certs/tls.crt" \
-            --set="ssl_private=/etc/ssl/private/tls.key" \
-            --set="ingress.enabled=true" \
-            --set="ingress.hosts[0].host=mcp-test.v2n2x.com" \
-            --set="ingress.hosts[0].paths[0].path=/" \
-            --set="ingress.hosts[0].paths[0].pathType=Prefix" \
-            --set="ingress.annotations.cert-manager\.io/cluster-issuer=letsencrypt-prod" \
-            --set="ingress.annotations.kubernetes\.io/ingress\.class=nginx" \
-            --set="ingress.tls[0].secretName=mcp-test-tls" \
-            --set="ingress.tls[0].hosts[0]=mcp-test.v2n2x.com" \
-            --set="service.type=LoadBalancer" \
-            --namespace mcp-gateway \
-            --create-namespace
-
-      - name: Get EKS Service External IP/Hostname
-        id: get-service-ip
-        run: |
-          echo "Waiting for service to get external address..."
-          external_address=""
-          while [ -z "$external_address" ]; do
-            echo "Waiting for external address..."
-            external_address=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            # If hostname is empty, try IP (depends on cloud provider)
-            if [ -z "$external_address" ]; then
-              external_address=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            fi
-            [ -z "$external_address" ] && sleep 10
-          done
-          echo "SERVICE_ADDRESS=$external_address" >> $GITHUB_ENV
+          echo "SERVICE_ADDRESS=placeholder.example.com" >> $GITHUB_ENV
+          echo "Image successfully built and pushed to ECR: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
+          echo "To deploy to EKS, you need to create an EKS cluster first."
+          echo "You can create one with: aws eks create-cluster --name mcp-gateway-eks-cluster --role-arn <EKS-SERVICE-ROLE-ARN> --resources-vpc-config subnetIds=<SUBNET-IDS>,securityGroupIds=<SECURITY-GROUP-IDS>"
 
       - name: Configure AWS credentials for Route53 account
         uses: aws-actions/configure-aws-credentials@v2
