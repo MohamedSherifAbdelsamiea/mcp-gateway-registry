@@ -142,3 +142,21 @@ jobs:
               }
             ]
           }'
+          
+      - name: Monitor deployment
+        run: |
+          echo "Deployment completed. Monitoring resources..."
+          
+          # Check pod status
+          kubectl get pods -n mcp-gateway
+          
+          # Check service status
+          kubectl get svc -n mcp-gateway
+          
+          # Check ingress status
+          kubectl get ingress -n mcp-gateway
+          
+          # Check certificate status
+          kubectl get certificates -n mcp-gateway
+          
+          echo "Deployment URL: https://mcp-test.v2n2x.com"
