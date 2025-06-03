@@ -26,6 +26,11 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names mcp-gateway-registry || aws ecr create-repository --repository-name mcp-gateway-registry
+        continue-on-error: true
+
       - name: Build and push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
