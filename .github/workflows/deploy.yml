@@ -38,19 +38,16 @@ jobs:
 
       - name: Update kubeconfig
         run: |
-          # Try to update kubeconfig, but continue if it fails
-          aws eks update-kubeconfig --name mcp-gateway-eks-cluster || echo "Failed to update kubeconfig, but continuing..."
+          # Update kubeconfig to connect to the cluster
+          aws eks update-kubeconfig --name mcp-gateway-eks-cluster
           
-          # Try to get nodes, but expect it might fail
-          kubectl get nodes || echo "No nodes available yet"
+          # Check for available nodes
+          echo "Checking for available nodes..."
+          kubectl get nodes
           
-          # Set placeholder service address since we know nodes are failing
-          echo "SERVICE_ADDRESS=placeholder.example.com" >> $GITHUB_ENV
-          
-          echo "Note: EKS node group creation is failing with 'NodeCreationFailure'. This is likely due to:"
-          echo "1. Security group needs port 10250 open for kubelet communication"
-          echo "2. Cluster endpoint might not be accessible from the nodes"
-          echo "3. Check CloudWatch logs for the node bootstrap script errors"
+          # Wait for nodes to be ready if needed
+          echo "Waiting for nodes to be ready..."
+          kubectl wait --for=condition=ready nodes --all --timeout=300s || echo "Not all nodes are ready yet, but continuing..."
 
       - name: Deploy to EKS
         run: |
