@@ -40,6 +40,15 @@ jobs:
         run: |
           aws eks update-kubeconfig --name mcp-gateway-eks-cluster
           kubectl get nodes || echo "No nodes available yet"
+          
+          # Check cluster endpoint access
+          echo "Checking cluster endpoint access..."
+          aws eks describe-cluster --name mcp-gateway-eks-cluster --query "cluster.resourcesVpcConfig.{EndpointPublicAccess:endpointPublicAccess,EndpointPrivateAccess:endpointPrivateAccess,PublicAccessCidrs:publicAccessCidrs}"
+          
+          # Check security group rules
+          echo "Checking security group rules..."
+          SG_ID=$(aws eks describe-cluster --name mcp-gateway-eks-cluster --query "cluster.resourcesVpcConfig.securityGroupIds[0]" --output text)
+          aws ec2 describe-security-group-rules --filters "Name=group-id,Values=$SG_ID" --query "SecurityGroupRules[?IpProtocol!=''-1'].{Protocol:IpProtocol,FromPort:FromPort,ToPort:ToPort,CidrIpv4:CidrIpv4}"
 
       - name: Deploy to EKS
         run: |
