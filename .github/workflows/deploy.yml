@@ -101,34 +101,19 @@ jobs:
           
           echo "Deployment to Fargate initiated. Pods will run on AWS Fargate."
 
-      - name: Get EKS Service External IP/Hostname
-        id: get-service-ip
+      - name: Get EKS Service NodePort
+        id: get-service-nodeport
         run: |
-          echo "Waiting for service to get external address..."
-          external_address=""
-          count=0
-          max_attempts=30
+          echo "Getting NodePort for the service..."
+          NODE_PORT=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.spec.ports[0].nodePort}')
           
-          while [ -z "$external_address" ] && [ $count -lt $max_attempts ]; do
-            echo "Attempt $count: Waiting for external address..."
-            external_address=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-            
-            # If hostname is empty, try IP (depends on cloud provider)
-            if [ -z "$external_address" ]; then
-              external_address=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-            fi
-            
-            if [ -z "$external_address" ]; then
-              sleep 10
-              count=$((count+1))
-            fi
-          done
+          echo "Service NodePort: $NODE_PORT"
           
-          if [ -z "$external_address" ]; then
-            echo "Could not get external address after $max_attempts attempts. Using placeholder."
-            external_address="placeholder.example.com"
-          fi
+          # For NodePort services, we need to use the cluster endpoint with the node port
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name mcp-gateway-eks-cluster --query "cluster.endpoint" --output text | sed 's|https://||')
           
+          # Set a placeholder service address using the cluster endpoint and node port
+          external_address="$CLUSTER_ENDPOINT:$NODE_PORT"
           echo "SERVICE_ADDRESS=$external_address" >> $GITHUB_ENV
           echo "Service address: $external_address"
           
