@@ -157,10 +157,35 @@ jobs:
 
       - name: Update Route53 record
         run: |
+          # First try to delete any existing record
+          echo "Attempting to delete existing record..."
           aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
             "Changes": [
               {
-                "Action": "UPSERT",
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                  "Name": "mcp-test.v2n2x.com",
+                  "Type": "CNAME",
+                  "TTL": 300,
+                  "ResourceRecords": [
+                    {
+                      "Value": "EC3E98331DEE9CFEF6EC0032F8C08DB7.gr7.us-east-1.eks.amazonaws.com:31975"
+                    }
+                  ]
+                }
+              }
+            ]
+          }' || echo "No existing record to delete or record has different values"
+          
+          # Wait a moment for DNS propagation
+          sleep 5
+          
+          # Create the new record
+          echo "Creating new record..."
+          aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
+            "Changes": [
+              {
+                "Action": "CREATE",
                 "ResourceRecordSet": {
                   "Name": "mcp-test.v2n2x.com",
                   "Type": "CNAME",
