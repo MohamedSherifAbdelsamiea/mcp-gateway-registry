@@ -36,14 +36,38 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Configure kubectl with eksctl
+      - name: Configure kubectl with service account token
         run: |
-          # Install eksctl
-          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-          sudo mv /tmp/eksctl /usr/local/bin
+          # Get cluster info
+          CLUSTER_NAME="mcp-gateway-eks-cluster"
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.endpoint" --output text)
+          CA_DATA=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.certificateAuthority.data" --output text)
           
-          # Use eksctl to access the cluster
-          eksctl utils write-kubeconfig --cluster=mcp-gateway-eks-cluster --region=us-east-1
+          # Create kubeconfig with token authentication
+          cat > kubeconfig << EOF
+          apiVersion: v1
+          clusters:
+          - cluster:
+              server: $CLUSTER_ENDPOINT
+              certificate-authority-data: $CA_DATA
+            name: $CLUSTER_NAME
+          contexts:
+          - context:
+              cluster: $CLUSTER_NAME
+              user: service-account
+              namespace: default
+            name: $CLUSTER_NAME
+          current-context: $CLUSTER_NAME
+          kind: Config
+          preferences: {}
+          users:
+          - name: service-account
+            user:
+              token: ${{ secrets.EKS_TOKEN }}
+          EOF
+          
+          export KUBECONFIG=$(pwd)/kubeconfig
+          echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
           
           # Check for available nodes
           echo "Checking for available nodes..."
