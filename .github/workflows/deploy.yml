@@ -96,7 +96,7 @@ jobs:
             ports:
             - port: 80
               targetPort: 7860
-            type: LoadBalancer
+            type: NodePort
           EOF
           
           echo "Deployment to Fargate initiated. Pods will run on AWS Fargate."
