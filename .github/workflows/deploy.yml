@@ -36,10 +36,15 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Update kubeconfig
+      - name: Update kubeconfig with authentication
         run: |
           # Update kubeconfig to connect to the cluster
           aws eks update-kubeconfig --name mcp-gateway-eks-cluster
+          
+          # Get authentication token and configure kubectl
+          aws eks get-token --cluster-name mcp-gateway-eks-cluster > /tmp/token
+          kubectl config set-credentials aws --token=$(cat /tmp/token | jq -r '.status.token')
+          kubectl config set-context --current --user=aws
           
           # Check for available nodes
           echo "Checking for available nodes..."
