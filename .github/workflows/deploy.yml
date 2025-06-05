@@ -36,70 +36,33 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Configure kubectl with AWS CLI
+      - name: Configure kubectl with eksctl
         run: |
-          # Create a kubeconfig file manually
-          CLUSTER_NAME="mcp-gateway-eks-cluster"
-          REGION="us-east-1"
+          # Install eksctl
+          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
           
-          # Get cluster endpoint
-          ENDPOINT=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.endpoint" --output text)
-          
-          # Get certificate authority
-          CA_DATA=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.certificateAuthority.data" --output text)
-          
-          # Create kubeconfig file
-          cat > kubeconfig << EOF
-          apiVersion: v1
-          clusters:
-          - cluster:
-              server: $ENDPOINT
-              certificate-authority-data: $CA_DATA
-            name: $CLUSTER_NAME
-          contexts:
-          - context:
-              cluster: $CLUSTER_NAME
-              user: aws
-            name: $CLUSTER_NAME
-          current-context: $CLUSTER_NAME
-          kind: Config
-          preferences: {}
-          users:
-          - name: aws
-            user:
-              exec:
-                apiVersion: client.authentication.k8s.io/v1beta1
-                command: aws
-                args:
-                  - --region
-                  - $REGION
-                  - eks
-                  - get-token
-                  - --cluster-name
-                  - $CLUSTER_NAME
-          EOF
-          
-          # Set KUBECONFIG environment variable
-          echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
+          # Use eksctl to access the cluster
+          eksctl utils write-kubeconfig --cluster=mcp-gateway-eks-cluster --region=us-east-1
           
           # Check for available nodes
           echo "Checking for available nodes..."
-          kubectl --kubeconfig=$(pwd)/kubeconfig get nodes
+          kubectl get nodes
           
           # Wait for nodes to be ready if needed
           echo "Waiting for nodes to be ready..."
-          kubectl --kubeconfig=$(pwd)/kubeconfig wait --for=condition=ready nodes --all --timeout=300s || echo "Not all nodes are ready yet, but continuing..."
+          kubectl wait --for=condition=ready nodes --all --timeout=300s || echo "Not all nodes are ready yet, but continuing..."
 
       - name: Deploy to EKS Fargate
         run: |
           # Create namespace if it doesn't exist
-          kubectl --kubeconfig=$(pwd)/kubeconfig create namespace mcp-gateway --dry-run=client -o yaml | kubectl --kubeconfig=$(pwd)/kubeconfig apply -f -
+          kubectl create namespace mcp-gateway --dry-run=client -o yaml | kubectl apply -f -
           
           # Label namespace for Fargate
-          kubectl --kubeconfig=$(pwd)/kubeconfig label namespace mcp-gateway app=mcp-gateway-registry --overwrite=true
+          kubectl label namespace mcp-gateway app=mcp-gateway-registry --overwrite=true
           
           # Deploy the application to Fargate
-          cat <<EOF | kubectl --kubeconfig=$(pwd)/kubeconfig apply -f -
+          cat <<EOF | kubectl apply -f -
           apiVersion: apps/v1
           kind: Deployment
           metadata:
@@ -146,7 +109,7 @@ jobs:
         id: get-service-nodeport
         run: |
           echo "Getting NodePort for the service..."
-          NODE_PORT=$(kubectl --kubeconfig=$(pwd)/kubeconfig get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.spec.ports[0].nodePort}')
+          NODE_PORT=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.spec.ports[0].nodePort}')
           
           echo "Service NodePort: $NODE_PORT"
           
@@ -160,7 +123,7 @@ jobs:
           
           # Check pod status
           echo "Checking pod status..."
-          kubectl --kubeconfig=$(pwd)/kubeconfig get pods -n mcp-gateway
+          kubectl get pods -n mcp-gateway
 
       - name: Configure AWS credentials for Route53 account
         uses: aws-actions/configure-aws-credentials@v2
