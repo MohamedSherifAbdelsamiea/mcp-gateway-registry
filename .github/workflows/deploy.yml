@@ -157,31 +157,31 @@ jobs:
 
       - name: Update Route53 record
         run: |
-          # First try to delete any existing record
-          echo "Attempting to delete existing record..."
+          # First try to delete the existing A record
+          echo "Attempting to delete existing A record..."
           aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
             "Changes": [
               {
                 "Action": "DELETE",
                 "ResourceRecordSet": {
                   "Name": "mcp-test.v2n2x.com",
-                  "Type": "CNAME",
+                  "Type": "A",
                   "TTL": 300,
                   "ResourceRecords": [
                     {
-                      "Value": "EC3E98331DEE9CFEF6EC0032F8C08DB7.gr7.us-east-1.eks.amazonaws.com:31975"
+                      "Value": "44.192.72.20"
                     }
                   ]
                 }
               }
             ]
-          }' || echo "No existing record to delete or record has different values"
+          }' || echo "Failed to delete A record, it may have different values"
           
           # Wait a moment for DNS propagation
           sleep 5
           
           # Create the new record
-          echo "Creating new record..."
+          echo "Creating new CNAME record..."
           aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
             "Changes": [
               {
@@ -192,19 +192,47 @@ jobs:
                   "TTL": 300,
                   "ResourceRecords": [
                     {
-                      "Value": "${{ env.SERVICE_ADDRESS }}"
+                      "Value": "'"${{ env.SERVICE_ADDRESS }}"'"
                     }
                   ]
                 }
               }
             ]
-          }'
+          }' || echo "Failed to create CNAME record, trying A record instead"
+          
+          # If CNAME fails, try to extract IP from the cluster endpoint and create an A record
+          if [ $? -ne 0 ]; then
+            echo "Trying to create A record instead..."
+            # Extract the NodePort
+            NODE_PORT=$(echo "${{ env.SERVICE_ADDRESS }}" | cut -d ":" -f2)
+            
+            # Create A record pointing to the EC2 instance
+            aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
+              "Changes": [
+                {
+                  "Action": "CREATE",
+                  "ResourceRecordSet": {
+                    "Name": "mcp-test.v2n2x.com",
+                    "Type": "A",
+                    "TTL": 300,
+                    "ResourceRecords": [
+                      {
+                        "Value": "44.192.72.20"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }'
+            echo "Created A record: mcp-test.v2n2x.com -> 44.192.72.20:${NODE_PORT}"
+          fi
           
       - name: Deployment summary
         run: |
           echo "Workflow completed successfully!"
           echo "Image built and pushed to: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
           echo "Route53 record updated: mcp-test.v2n2x.com -> ${{ env.SERVICE_ADDRESS }}"
+          echo "Access your service at: http://mcp-test.v2n2x.com:$(echo ${{ env.SERVICE_ADDRESS }} | cut -d ':' -f2)"
           echo ""
           echo "Next steps:"
           echo "1. Create an EKS cluster"
