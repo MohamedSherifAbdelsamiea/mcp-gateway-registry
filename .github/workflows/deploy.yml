@@ -38,8 +38,8 @@ jobs:
 
       - name: Update kubeconfig with authentication
         run: |
-          # Update kubeconfig to connect to the cluster with role ARN
-          aws eks update-kubeconfig --name mcp-gateway-eks-cluster --role-arn arn:aws:iam::338293206254:role/GitHubActionsEKSRole
+          # Update kubeconfig to connect to the cluster without role assumption
+          aws eks update-kubeconfig --name mcp-gateway-eks-cluster
           
           # Check for available nodes
           echo "Checking for available nodes..."
