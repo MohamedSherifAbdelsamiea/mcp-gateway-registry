@@ -1,240 +1,43 @@
-name: Deploy to EKS and Update Route53
+name: Deploy MCP Gateway Registry
 
 on:
   push:
-    branches:
-      - Adding-uvx-support
-
-permissions:
-  id-token: write
-  contents: read
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Configure AWS credentials for EKS account
-        uses: aws-actions/configure-aws-credentials@v2
+      - uses: actions/checkout@v2
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::338293206254:role/GitHubActionsEKSRole
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-
+      
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Build and push image to ECR
+      
+      - name: Fix mixed content issues
+        run: |
+          # Ensure all URLs use HTTPS instead of HTTP
+          find ./registry/templates -type f -name "*.html" -exec sed -i 's|http://mcp-test.v2n2x.com|https://mcp-test.v2n2x.com|g' {} \;
+          echo "Fixed mixed content issues in HTML templates"
+      
+      - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: mcp-gateway-registry
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Repository already created manually: 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-      - name: Configure kubectl with service account token
+      
+      - name: Update Kubernetes deployment
         run: |
-          # Get cluster info
-          CLUSTER_NAME="mcp-gateway-eks-cluster"
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.endpoint" --output text)
-          CA_DATA=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.certificateAuthority.data" --output text)
-          
-          # Create kubeconfig with token authentication
-          cat > kubeconfig << EOF
-          apiVersion: v1
-          clusters:
-          - cluster:
-              server: $CLUSTER_ENDPOINT
-              certificate-authority-data: $CA_DATA
-            name: $CLUSTER_NAME
-          contexts:
-          - context:
-              cluster: $CLUSTER_NAME
-              user: service-account
-              namespace: default
-            name: $CLUSTER_NAME
-          current-context: $CLUSTER_NAME
-          kind: Config
-          preferences: {}
-          users:
-          - name: service-account
-            user:
-              token: ${{ secrets.EKS_TOKEN }}
-          EOF
-          
-          export KUBECONFIG=$(pwd)/kubeconfig
-          echo "KUBECONFIG=$(pwd)/kubeconfig" >> $GITHUB_ENV
-          
-          # Check for available nodes
-          echo "Checking for available nodes..."
-          kubectl get nodes
-          
-          # Wait for nodes to be ready if needed
-          echo "Waiting for nodes to be ready..."
-          kubectl wait --for=condition=ready nodes --all --timeout=300s || echo "Not all nodes are ready yet, but continuing..."
-
-      - name: Deploy to EKS Fargate
-        run: |
-          # Create namespace if it doesn't exist
-          kubectl create namespace mcp-gateway --dry-run=client -o yaml | kubectl apply -f -
-          
-          # Label namespace for Fargate
-          kubectl label namespace mcp-gateway app=mcp-gateway-registry --overwrite=true
-          
-          # Deploy the application to Fargate
-          cat <<EOF | kubectl apply -f -
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: mcp-gateway-registry
-            namespace: mcp-gateway
-          spec:
-            replicas: 2
-            selector:
-              matchLabels:
-                app: mcp-gateway-registry
-            template:
-              metadata:
-                labels:
-                  app: mcp-gateway-registry
-              spec:
-                containers:
-                - name: mcp-gateway-registry
-                  image: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
-                  ports:
-                  - containerPort: 7860
-                  env:
-                  - name: ADMIN_USER
-                    value: "admin"
-                  - name: ADMIN_PASSWORD
-                    value: "${{ secrets.ADMIN_PASSWORD || '123' }}"
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: mcp-gateway-registry
-            namespace: mcp-gateway
-          spec:
-            selector:
-              app: mcp-gateway-registry
-            ports:
-            - port: 80
-              targetPort: 7860
-            type: NodePort
-          EOF
-          
-          echo "Deployment to Fargate initiated. Pods will run on AWS Fargate."
-
-      - name: Get EKS Service NodePort
-        id: get-service-nodeport
-        run: |
-          echo "Getting NodePort for the service..."
-          NODE_PORT=$(kubectl get svc mcp-gateway-registry -n mcp-gateway -o jsonpath='{.spec.ports[0].nodePort}')
-          
-          echo "Service NodePort: $NODE_PORT"
-          
-          # For NodePort services, we need to use the cluster endpoint with the node port
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name mcp-gateway-eks-cluster --query "cluster.endpoint" --output text | sed 's|https://||')
-          
-          # Set a placeholder service address using the cluster endpoint and node port
-          external_address="$CLUSTER_ENDPOINT:$NODE_PORT"
-          echo "SERVICE_ADDRESS=$external_address" >> $GITHUB_ENV
-          echo "Service address: $external_address"
-          
-          # Check pod status
-          echo "Checking pod status..."
-          kubectl get pods -n mcp-gateway
-
-      - name: Configure AWS credentials for Route53 account
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::836966548078:role/GitHubActionsRoute53Role
-          aws-region: us-east-1
-
-      - name: Update Route53 record
-        run: |
-          # First try to delete the existing A record
-          echo "Attempting to delete existing A record..."
-          aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
-            "Changes": [
-              {
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                  "Name": "mcp-test.v2n2x.com",
-                  "Type": "A",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "44.192.72.20"
-                    }
-                  ]
-                }
-              }
-            ]
-          }' || echo "Failed to delete A record, it may have different values"
-          
-          # Wait a moment for DNS propagation
-          sleep 5
-          
-          # Create the new record
-          echo "Creating new CNAME record..."
-          aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
-            "Changes": [
-              {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                  "Name": "mcp-test.v2n2x.com",
-                  "Type": "CNAME",
-                  "TTL": 300,
-                  "ResourceRecords": [
-                    {
-                      "Value": "'"${{ env.SERVICE_ADDRESS }}"'"
-                    }
-                  ]
-                }
-              }
-            ]
-          }' || echo "Failed to create CNAME record, trying A record instead"
-          
-          # If CNAME fails, try to extract IP from the cluster endpoint and create an A record
-          if [ $? -ne 0 ]; then
-            echo "Trying to create A record instead..."
-            # Extract the NodePort
-            NODE_PORT=$(echo "${{ env.SERVICE_ADDRESS }}" | cut -d ":" -f2)
-            
-            # Create A record pointing to the EC2 instance
-            aws route53 change-resource-record-sets --hosted-zone-id Z00677396IM7D3SZ8WND --change-batch '{
-              "Changes": [
-                {
-                  "Action": "CREATE",
-                  "ResourceRecordSet": {
-                    "Name": "mcp-test.v2n2x.com",
-                    "Type": "A",
-                    "TTL": 300,
-                    "ResourceRecords": [
-                      {
-                        "Value": "44.192.72.20"
-                      }
-                    ]
-                  }
-                }
-              ]
-            }'
-            echo "Created A record: mcp-test.v2n2x.com -> 44.192.72.20:${NODE_PORT}"
-          fi
-          
-      - name: Deployment summary
-        run: |
-          echo "Workflow completed successfully!"
-          echo "Image built and pushed to: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
-          echo "Route53 record updated: mcp-test.v2n2x.com -> ${{ env.SERVICE_ADDRESS }}"
-          echo "Access your service at: http://mcp-test.v2n2x.com:$(echo ${{ env.SERVICE_ADDRESS }} | cut -d ':' -f2)"
-          echo ""
-          echo "Next steps:"
-          echo "1. Create an EKS cluster"
-          echo "2. Update the workflow to use your EKS cluster name"
-          echo "3. Re-enable the EKS deployment steps"
+          aws eks update-kubeconfig --name mcp-gateway-eks-cluster --region us-east-1
+          kubectl set image deployment/mcp-gateway-registry-new mcp-gateway-registry=${{ steps.login-ecr.outputs.registry }}/mcp-gateway-registry:${{ github.sha }} -n mcp-gateway

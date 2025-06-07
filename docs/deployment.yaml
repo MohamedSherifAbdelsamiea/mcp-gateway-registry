@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-gateway-registry
+  namespace: mcp-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-gateway-registry
+  template:
+    metadata:
+      labels:
+        app: mcp-gateway-registry
+      annotations:
+        CapacityProvisioned: "1vCPU 2GB"
+    spec:
+      containers:
+      - name: mcp-gateway-registry
+        image: 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:4e41864e857f572380f05aad51145dbf9ddf5a41
+        ports:
+        - containerPort: 7860
+        env:
+        - name: ADMIN_USER
+          value: "admin"
+        - name: ADMIN_PASSWORD
+          value: "123"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /login
+            port: 7860
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /login
+            port: 7860
+          initialDelaySeconds: 60
+          periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-gateway-registry
+  namespace: mcp-gateway
+spec:
+  selector:
+    app: mcp-gateway-registry
+  ports:
+  - port: 80
+    targetPort: 7860
+    protocol: TCP
+  type: NodePort
