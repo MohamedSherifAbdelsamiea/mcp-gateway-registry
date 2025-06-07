@@ -46,9 +46,9 @@ aws:
   alb:
     name: mcp-gateway-alb
     dns_name: mcp-gateway-alb-1589071366.us-east-1.elb.amazonaws.com
-    target_group_arn: arn:aws:elasticloadbalancing:us-east-1:338293206254:targetgroup/mcp-gateway-tg/18ec9cffd9008a39
+    target_group_arn: arn:aws:elasticloadbalancing:us-east-1:ACCOUNT:targetgroup/mcp-gateway-tg/18ec9cffd9008a39
     security_group: sg-087c93faf3acbcf13
-    certificate_arn: arn:aws:acm:us-east-1:338293206254:certificate/f0f70158-6f58-42e7-a608-884331fd8c03
+    certificate_arn: arn:aws:acm:us-east-1:ACCOUNT:certificate/CERTIFICATE-ID
     health_check:
       path: /login
       protocol: HTTP
