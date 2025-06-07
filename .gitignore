@@ -186,3 +186,6 @@ logs/
 
 # Agent testing
 agents/test_results/
+config/network.yaml
+docs/resources.md
+kubernetes/alb-config.yaml
