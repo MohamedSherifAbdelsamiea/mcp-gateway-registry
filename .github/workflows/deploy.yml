@@ -33,11 +33,13 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: mcp-gateway-registry
           IMAGE_TAG: ${{ github.sha }}
+          DEBUG_MODE: ${{ secrets.DEBUG_MODE || 'false' }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build --build-arg DEBUG_MODE=$DEBUG_MODE -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
       
       - name: Update Kubernetes deployment
         run: |
           aws eks update-kubeconfig --name mcp-gateway-eks-cluster --region us-east-1
           kubectl set image deployment/mcp-gateway-registry-new mcp-gateway-registry=${{ steps.login-ecr.outputs.registry }}/mcp-gateway-registry:${{ github.sha }} -n mcp-gateway
+          kubectl set env deployment/mcp-gateway-registry-new DEBUG_MODE=${{ secrets.DEBUG_MODE || 'false' }} -n mcp-gateway

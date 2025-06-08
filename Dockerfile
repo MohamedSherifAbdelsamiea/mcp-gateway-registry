@@ -40,13 +40,15 @@ EXPOSE 80 443 7860
 # Provide sensible defaults or leave empty if they should be explicitly set
 ARG SECRET_KEY=""
 ARG ADMIN_USER="admin"
-ARG ADMIN_PASSWORD=""
-ARG POLYGON_API_KEY=""
+ARG ADMIN_PASSWORD="123"
+ARG POLYGON_API_KEY="EkzPR2VJ_3lSH1xloFBv4cDZJUGMpMLn"
+ARG DEBUG_MODE="false"
 
 ENV SECRET_KEY=$SECRET_KEY
 ENV ADMIN_USER=$ADMIN_USER
 ENV ADMIN_PASSWORD=$ADMIN_PASSWORD
 ENV POLYGON_API_KEY=$POLYGON_API_KEY
+ENV DEBUG_MODE=$DEBUG_MODE
 
 # Run the entrypoint script when the container launches
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

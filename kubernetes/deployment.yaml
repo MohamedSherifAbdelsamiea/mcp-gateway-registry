@@ -25,6 +25,10 @@ spec:
           value: "admin"
         - name: ADMIN_PASSWORD
           value: "123"
+        - name: DEBUG_MODE
+          value: "false"
+        - name: DEBUG_MODE
+          value: "false"
         resources:
           requests:
             memory: "1Gi"
