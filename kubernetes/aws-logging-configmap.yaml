@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-logging
+  namespace: kube-system
+data:
+  output.conf: |
+    [OUTPUT]
+        Name cloudwatch_logs
+        Match   kube.*
+        region us-east-1
+        log_group_name /aws/eks/mcp-gateway-eks-cluster/cluster
+        log_stream_prefix fargate-
+        auto_create_group true

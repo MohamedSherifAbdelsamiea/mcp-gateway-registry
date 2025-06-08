@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/instance: aws-load-balancer-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-load-balancer-controller
+      app.kubernetes.io/instance: aws-load-balancer-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aws-load-balancer-controller
+        app.kubernetes.io/instance: aws-load-balancer-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        CapacityProvisioned: "1vCPU 2GB"
+    spec:
+      serviceAccountName: aws-load-balancer-controller
+      containers:
+        - name: aws-load-balancer-controller
+          image: public.ecr.aws/eks/aws-load-balancer-controller:v2.13.2
+          args:
+            - --cluster-name=mcp-gateway-eks-cluster
+            - --ingress-class=alb
+            - --aws-vpc-id=vpc-002d11184d052b5ed
+            - --aws-region=us-east-1
+            - --log-level=debug
+            - --disable-ingress-class-annotation
+            - --enable-shield=false
+            - --enable-waf=false
+            - --enable-wafv2=false
+          resources:
+            limits:
+              cpu: 1
+              memory: 2Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          env:
+            - name: AWS_STS_REGIONAL_ENDPOINTS
+              value: "regional"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: AWS_ROLE_ARN
+              value: "arn:aws:iam::338293206254:role/eksctl-mcp-gateway-eks-cluster-addon-iamservi-Role1-LdWu6WSJHyBw"
+            - name: AWS_WEB_IDENTITY_TOKEN_FILE
+              value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+          volumeMounts:
+            - name: cert
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+      volumes:
+        - name: cert
+          secret:
+            secretName: aws-load-balancer-tls

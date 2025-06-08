@@ -1,0 +1,12 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: mcp-gateway-eks-cluster
+  region: us-east-1
+fargateProfiles:
+  - name: efs-csi-driver
+    selectors:
+      - namespace: kube-system
+        labels:
+          app: efs-csi-controller
+          app.kubernetes.io/name: aws-efs-csi-driver

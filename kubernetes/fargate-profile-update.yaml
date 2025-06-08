@@ -1,0 +1,15 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: mcp-gateway-eks-cluster
+  region: us-east-1
+fargateProfiles:
+  - name: aws-lb-controller
+    selectors:
+      - namespace: kube-system
+        labels:
+          app.kubernetes.io/name: aws-load-balancer-controller
+    subnets:
+      - subnet-05b991011b46dcebb
+      - subnet-0ceffc2d0c013cf1c
+    podExecutionRoleARN: arn:aws:iam::338293206254:role/AmazonEKSFargatePodExecutionRole

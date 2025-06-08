@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: efs-csi-node-fargate
+  namespace: kube-system
+  labels:
+    app: efs-csi-node-fargate
+    app.kubernetes.io/name: aws-efs-csi-driver
+spec:
+  selector:
+    matchLabels:
+      app: efs-csi-node-fargate
+  template:
+    metadata:
+      labels:
+        app: efs-csi-node-fargate
+        app.kubernetes.io/name: aws-efs-csi-driver
+        eks.amazonaws.com/fargate-profile: kube-system
+    spec:
+      serviceAccountName: efs-csi-node-sa
+      containers:
+        - name: efs-plugin
+          image: public.ecr.aws/efs-csi-driver/amazon/aws-efs-csi-driver:v2.1.8
+          args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --logtostderr
+            - --v=2
+            - --delete-access-point-root-dir=false
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:/csi/csi.sock
+          securityContext:
+            privileged: true
+          ports:
+            - name: healthz
+              containerPort: 9809
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 5
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: "Bidirectional"
+            - name: plugin-dir
+              mountPath: /csi
+            - name: efs-state-dir
+              mountPath: /var/run/efs
+            - name: efs-utils-config
+              mountPath: /etc/amazon/efs
+            - name: efs-utils-config-legacy
+              mountPath: /etc/amazon/efs-legacy
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/efs.csi.aws.com/
+            type: DirectoryOrCreate
+        - name: efs-state-dir
+          hostPath:
+            path: /var/run/efs
+            type: DirectoryOrCreate
+        - name: efs-utils-config
+          hostPath:
+            path: /etc/amazon/efs
+            type: DirectoryOrCreate
+        - name: efs-utils-config-legacy
+          hostPath:
+            path: /etc/amazon/efs-legacy
+            type: DirectoryOrCreate

@@ -1,0 +1,24 @@
+clusterName: mcp-gateway-eks-cluster
+region: us-east-1
+vpcId: vpc-002d11184d052b5ed
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller
+resources:
+  limits:
+    cpu: 1
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+podDisruptionBudget:
+  maxUnavailable: 1
+enableShield: false
+enableWaf: false
+enableWafv2: false
+ingressClass: alb
+createIngressClassResource: false
+replicaCount: 1
+logLevel: debug
+existingLoadBalancers:
+  - arn:aws:elasticloadbalancing:us-east-1:338293206254:loadbalancer/app/mcp-gateway-alb/ccfab188ebb93cde
