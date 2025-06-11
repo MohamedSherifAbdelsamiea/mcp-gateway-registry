@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-gateway-registry-new
+  namespace: mcp-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-gateway-registry
+  template:
+    metadata:
+      labels:
+        app: mcp-gateway-registry
+      annotations:
+        eks.amazonaws.com/log-group-name: /aws/eks/mcp-gateway-pods
+        eks.amazonaws.com/log-stream-prefix: fargate
+    spec:
+      containers:
+      - name: mcp-gateway-registry
+        image: 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:4e41864e857f572380f05aad51145dbf9ddf5a41
+        ports:
+        - containerPort: 7860
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1
+            memory: 2Gi
+        env:
+        - name: ADMIN_USER
+          value: admin
+        - name: ADMIN_PASSWORD
+          value: "123"
+        - name: DEBUG_MODE
+          value: "false"

@@ -1,0 +1,23 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: mcp-gateway-eks-cluster
+  region: us-east-1
+vpc:
+  id: vpc-002d11184d052b5ed
+  subnets:
+    public:
+      us-east-1a:
+        id: subnet-031f6710f7f128203
+      us-east-1b:
+        id: subnet-022d1464b76cef18b
+  securityGroup: sg-0f31d4112628aa75e
+managedNodeGroups:
+  - name: alb-controller-ng
+    instanceType: t3.medium
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 2
+    volumeSize: 20
+    iam:
+      instanceRoleARN: arn:aws:iam::338293206254:role/EksNodeRole

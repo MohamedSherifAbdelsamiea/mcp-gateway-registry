@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: efs-csi-controller-fargate
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-csi-controller-fargate
+  template:
+    metadata:
+      labels:
+        app: efs-csi-controller-fargate
+        app.kubernetes.io/name: aws-efs-csi-driver
+    spec:
+      serviceAccountName: efs-csi-controller-sa
+      containers:
+      - name: efs-plugin
+        image: public.ecr.aws/efs-csi-driver/amazon/aws-efs-csi-driver:v2.1.8
+        args:
+          - --endpoint=$(CSI_ENDPOINT)
+          - --logtostderr
+          - --v=2
+        env:
+          - name: CSI_ENDPOINT
+            value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: csi-provisioner
+        image: public.ecr.aws/eks-distro/kubernetes-csi/external-provisioner:v5.2.0-eks-1-32-6
+        args:
+          - --csi-address=$(ADDRESS)
+          - --v=2
+          - --feature-gates=Topology=true
+          - --leader-election
+        env:
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy/
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

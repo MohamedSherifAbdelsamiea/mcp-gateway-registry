@@ -1,0 +1,14 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: mcp-gateway-eks-cluster
+  region: us-east-1
+fargateProfiles:
+  - name: kube-system-fargate
+    selectors:
+      - namespace: kube-system
+        labels:
+          app.kubernetes.io/name: aws-efs-csi-driver
+    subnets:
+      - subnet-05b991011b46dcebb
+      - subnet-0ceffc2d0c013cf1c

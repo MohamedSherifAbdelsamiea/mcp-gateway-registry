@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: efs-static-provisioner
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-static-provisioner
+  template:
+    metadata:
+      labels:
+        app: efs-static-provisioner
+        app.kubernetes.io/name: aws-efs-csi-driver
+    spec:
+      containers:
+      - name: efs-provisioner
+        image: public.ecr.aws/eks-distro/kubernetes-csi/external-provisioner:v5.2.0-eks-1-32-6
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "EFS Static Provisioner is running"
+          while true; do
+            sleep 3600
+          done
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+          requests:
+            memory: "64Mi"
+            cpu: "50m"

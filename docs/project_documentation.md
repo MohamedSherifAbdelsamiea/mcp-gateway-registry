@@ -97,6 +97,34 @@ spec:
 mcp-test.v2n2x.com. 300 IN CNAME mcp-gateway-alb-1589071366.us-east-1.elb.amazonaws.com.
 ```
 
+### 4. AWS Load Balancer Controller Webhook Issues
+**Issue**: Add-ons like Prometheus Node Exporter, AWS Distro for OpenTelemetry, and Amazon CloudWatch Observability failing with webhook errors.
+**Solution**: 
+- AWS Load Balancer Controller requires EC2 nodes and cannot run properly on Fargate due to networking limitations
+- Created a dedicated node group for running the AWS Load Balancer Controller:
+
+```bash
+# Create a dedicated node group for the AWS Load Balancer Controller
+aws eks create-nodegroup \
+  --cluster-name mcp-gateway-eks-cluster \
+  --nodegroup-name alb-controller-ng \
+  --scaling-config minSize=1,maxSize=2,desiredSize=1 \
+  --instance-types t3.medium \
+  --subnets subnet-031f6710f7f128203 subnet-022d1464b76cef18b \
+  --node-role arn:aws:iam::338293206254:role/EksNodeRole
+```
+
+- Reinstalled the AWS Load Balancer Controller using Helm to ensure proper webhook configuration:
+
+```bash
+# Reinstall AWS Load Balancer Controller with Helm
+helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
+  --set clusterName=mcp-gateway-eks-cluster \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  -n kube-system
+```
+
 ## API Documentation
 
 The MCP Gateway Registry provides the following API endpoints:
@@ -125,6 +153,12 @@ The MCP Gateway Registry provides the following API endpoints:
 ```bash
 # Check pod status
 kubectl get pods -n mcp-gateway -o wide
+
+# Check pod logs (for non-Fargate pods)
+kubectl logs -n mcp-gateway <pod-name>
+
+# Check Fargate pod logs in CloudWatch
+aws logs get-log-events --log-group-name /aws/eks/mcp-gateway-pods --log-stream-name fargate-<pod-id>
 
 # Check ALB target health
 aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:us-east-1:338293206254:targetgroup/mcp-gateway-tg/18ec9cffd9008a39

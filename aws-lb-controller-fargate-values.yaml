@@ -1,0 +1,13 @@
+serviceAccount:
+  create: false
+  name: aws-load-balancer-controller
+
+# Disable webhook as it does not work well on Fargate
+enableServiceMutatorWebhook: false
+
+# Disable cert-manager integration
+enableCertManager: false
+
+# Disable webhook TLS verification
+webhookTLS:
+  enabled: false

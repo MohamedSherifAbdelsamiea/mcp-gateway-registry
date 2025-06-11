@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-logging
+  namespace: mcp-gateway
+data:
+  flb_log_cw: "true"  # Enable CloudWatch logging
+  filters.conf: |
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Merge_Log On
+        Keep_Log Off
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude Off
+  output.conf: |
+    [OUTPUT]
+        Name cloudwatch_logs
+        Match kube.*
+        region us-east-1
+        log_group_name /aws/eks/mcp-gateway-pods
+        log_stream_prefix fargate-
+        auto_create_group true

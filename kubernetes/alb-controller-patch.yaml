@@ -5,16 +5,10 @@ metadata:
   namespace: kube-system
 spec:
   template:
-    metadata:
-      annotations:
-        CapacityProvisioned: "1vCPU 2GB"
     spec:
       containers:
       - name: aws-load-balancer-controller
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
-          limits:
-            memory: "2Gi"
-            cpu: "1"
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP

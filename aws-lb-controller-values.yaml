@@ -1,0 +1,7 @@
+nodeSelector:
+  eks.amazonaws.com/nodegroup: alb-controller-ng
+tolerations:
+  - key: "eks.amazonaws.com/compute-type"
+    operator: "Equal"
+    value: "ec2"
+    effect: "NoSchedule"

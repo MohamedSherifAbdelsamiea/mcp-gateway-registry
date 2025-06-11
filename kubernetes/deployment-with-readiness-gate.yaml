@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-gateway-registry-new
+  namespace: mcp-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-gateway-registry-new
+  template:
+    metadata:
+      labels:
+        app: mcp-gateway-registry-new
+      annotations:
+        alb.ingress.kubernetes.io/pod-readiness-gate-inject: "true"
+    spec:
+      containers:
+      - name: mcp-gateway-registry
+        image: 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:latest
+        ports:
+        - containerPort: 7860
+        env:
+        - name: DEBUG_MODE
+          value: "false"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /login
+            port: 7860
+          initialDelaySeconds: 30
+          periodSeconds: 10

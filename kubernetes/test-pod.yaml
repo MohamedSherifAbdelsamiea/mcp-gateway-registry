@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: efs-test-pod
+  namespace: mcp-gateway
+spec:
+  containers:
+  - name: efs-test
+    image: busybox
+    command: ["/bin/sh"]
+    args: ["-c", "echo 'This is a test file from pod 1' > /data/test.txt && sleep 3600"]
+    volumeMounts:
+    - name: efs-volume
+      mountPath: /data
+  volumes:
+  - name: efs-volume
+    persistentVolumeClaim:
+      claimName: mcp-gateway-registry-pvc

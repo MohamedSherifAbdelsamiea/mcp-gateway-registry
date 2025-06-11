@@ -1,0 +1,93 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: aws-load-balancer-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: kube-system/aws-load-balancer-serving-cert
+spec:
+  webhooks:
+  - name: validate.ingress.v1.k8s.aws
+    failurePolicy: Ignore
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /validate-ingress-v1-k8s-aws
+    rules:
+    - apiGroups:
+      - networking.k8s.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - ingresses
+    admissionReviewVersions: ["v1"]
+  - name: validate.targetgroupbinding.elbv2.k8s.aws
+    failurePolicy: Ignore
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /validate-elbv2-k8s-aws-targetgroupbinding
+    rules:
+    - apiGroups:
+      - elbv2.k8s.aws
+      apiVersions:
+      - v1beta1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - targetgroupbindings
+    admissionReviewVersions: ["v1"]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: aws-load-balancer-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: kube-system/aws-load-balancer-serving-cert
+spec:
+  webhooks:
+  - name: mutate.ingress.v1.k8s.aws
+    failurePolicy: Ignore
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /mutate-ingress-v1-k8s-aws
+    rules:
+    - apiGroups:
+      - networking.k8s.io
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - ingresses
+    admissionReviewVersions: ["v1"]
+  - name: mutate.service.v1.k8s.aws
+    failurePolicy: Ignore
+    sideEffects: None
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /mutate-v1-service
+    rules:
+    - apiGroups:
+      - ""
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - services
+    admissionReviewVersions: ["v1"]
