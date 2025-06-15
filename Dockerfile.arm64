@@ -1,0 +1,29 @@
+# ARM64-specific Dockerfile for local development
+FROM --platform=linux/arm64/v8 python:3.11-slim
+
+WORKDIR /app
+
+# Copy extracted source code
+COPY extracted-src/ /app/
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
+
+# Copy the modified template files
+COPY modified-templates/login.html /app/registry/templates/login.html
+
+# Expose port
+EXPOSE 80
+
+# Set environment variables
+ENV MCP_GATEWAY_PORT=80
+ENV MCP_GATEWAY_HOST=0.0.0.0
+
+# Start the application
+CMD ["python", "-m", "registry.main"]

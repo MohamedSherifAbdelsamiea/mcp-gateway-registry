@@ -1,0 +1,14 @@
+version: '3'
+services:
+  mcp-gateway-registry:
+    build:
+      context: .
+      dockerfile: Dockerfile.arm64
+    platform: linux/arm64/v8
+    ports:
+      - "8080:80"  # Map container port 80 to host port 8080
+    volumes:
+      - ./extracted-src/registry:/app/registry  # Mount registry directory for live changes
+    environment:
+      - MCP_GATEWAY_PORT=80
+      - MCP_GATEWAY_HOST=0.0.0.0

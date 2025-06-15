@@ -1,52 +1,64 @@
 # MCP Gateway Registry Development Repository
 
-This repository contains development files for the MCP Gateway Registry.
+This repository contains development files for the MCP Gateway Registry, with support for cross-architecture development (amd64 and arm64).
 
-## Development Setup
+## Repository Structure
 
-1. Build and run the development container:
+- `extracted-src/` - Source code extracted from the original ECR image
+- `modified-templates/` - Modified template files
+- `Dockerfile` - Original Dockerfile for amd64 architecture
+- `Dockerfile.arm64` - ARM64-specific Dockerfile for local development
+- `docker-compose.yml` - Docker Compose file for amd64 architecture
+- `docker-compose.arm64.yml` - Docker Compose file for ARM64 architecture
+- `build-and-push.sh` - Script to build and push amd64 image to ECR
+- `build-and-push-multiarch.sh` - Script to build and push multi-architecture image to ECR
+
+## Local Development on ARM64 (Apple Silicon)
+
+1. Build and run the development container using the ARM64-specific Docker Compose file:
+   ```bash
+   docker-compose -f docker-compose.arm64.yml up --build
+   ```
+
+2. Make changes to the source code in the `extracted-src/registry` directory.
+
+3. Test your changes locally by accessing the application at http://localhost:8080.
+
+## Local Development on AMD64
+
+1. Build and run the development container using the standard Docker Compose file:
    ```bash
    docker-compose up --build
    ```
 
-2. Make changes to the source code in the `src` directory.
+2. Make changes to the source code in the `extracted-src/registry` directory.
 
 3. Test your changes locally by accessing the application at http://localhost:8080.
 
 ## Building and Pushing to ECR
 
-1. Create a new tag for your updated image:
-   ```bash
-   NEW_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "dev-$(date +%Y%m%d-%H%M%S)")
-   ```
+### Option 1: Build for AMD64 Only
 
-2. Build the image:
-   ```bash
-   docker build -t mcp-gateway-registry:$NEW_TAG .
-   ```
+```bash
+./build-and-push.sh
+```
 
-3. Tag the image for your ECR repository:
-   ```bash
-   docker tag mcp-gateway-registry:$NEW_TAG 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:$NEW_TAG
-   ```
+### Option 2: Build Multi-Architecture Image (Recommended)
 
-4. Push to ECR:
-   ```bash
-   docker push 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:$NEW_TAG
-   ```
+```bash
+./build-and-push-multiarch.sh
+```
+
+This will build images for both AMD64 and ARM64 architectures and push them to ECR with the appropriate manifests.
 
 ## Updating the Deployment
 
-1. Update your Kubernetes deployment:
-   ```bash
-   kubectl set image deployment/mcp-gateway-registry mcp-gateway-registry=338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:$NEW_TAG -n mcp-registry
-   ```
+After building and pushing the image:
 
-2. Or apply an updated manifest:
-   ```bash
-   # Update the image tag in your update-deployment.yaml file
-   kubectl apply -f update-deployment.yaml
-   ```
+```bash
+# Apply the updated deployment manifest
+kubectl apply -f update-deployment.yaml
+```
 
 ## Verifying the Deployment
 
