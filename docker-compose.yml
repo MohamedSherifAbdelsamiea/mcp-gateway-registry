@@ -1,0 +1,8 @@
+version: '3'
+services:
+  mcp-gateway-registry:
+    build: .
+    ports:
+      - "8080:80"  # Adjust ports as needed
+    volumes:
+      - ./src:/app/src  # Mount your source code for live changes
