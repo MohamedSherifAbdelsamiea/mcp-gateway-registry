@@ -3,7 +3,7 @@ name: Deploy to EKS and Update Route53
 on:
   push:
     branches:
-      - development
+      - kubernetes
 
 permissions:
   id-token: write
