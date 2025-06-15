@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-gateway-registry
+  namespace: mcp-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-gateway-registry
+  template:
+    metadata:
+      labels:
+        app: mcp-gateway-registry
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+    spec:
+      containers:
+      - name: mcp-gateway-registry
+        image: 338293206254.dkr.ecr.us-east-1.amazonaws.com/mcp-gateway-registry:${NEW_TAG}
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "4"
+            memory: "16Gi"
+          limits:
+            cpu: "8"
+            memory: "32Gi"
+        env:
+        - name: MCP_GATEWAY_PORT
+          value: "80"
+        - name: MCP_GATEWAY_HOST
+          value: "0.0.0.0"
+        volumeMounts:
+        - name: mcp-gateway-data
+          mountPath: /app/data
+      volumes:
+      - name: mcp-gateway-data
+        persistentVolumeClaim:
+          claimName: mcp-gateway-pvc
