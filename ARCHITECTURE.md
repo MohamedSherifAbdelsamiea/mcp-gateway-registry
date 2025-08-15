@@ -376,7 +376,7 @@ DEPLOY_COMPLETE_INFRASTRUCTURE=false
 CLUSTER_NAME=mcp-gateway-registry
 DOMAIN_NAME=mcp.v2n2x.com
 EFS_FILE_SYSTEM_ID=fs-037112380c8bf7ede
-CERTIFICATE_ARN=arn:aws:acm:us-east-1:889039329328:certificate/027f5c18-e5ae-4006-8255-f1212518e12e
+CERTIFICATE_ARN=arn:aws:acm:region:account:certificate/your-cert-id
 ADMIN_PASSWORD=NewTempPassword123!
 ```
 
