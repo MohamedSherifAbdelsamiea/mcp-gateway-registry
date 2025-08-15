@@ -212,7 +212,7 @@ CREATE_CERTIFICATE=true
 ```bash
 # .env configuration
 DOMAIN_NAME=mcp.yourdomain.com
-CERTIFICATE_ARN=arn:aws:acm:us-east-1:123456789012:certificate/existing-cert-id
+CERTIFICATE_ARN=arn:aws:acm:region:account:certificate/existing-cert-id
 ```
 
 #### Option 3: Manual DNS Validation (Cross-Account Domains)
