@@ -4,6 +4,38 @@
 
 This CDK project deploys the MCP Gateway Registry as a microservices architecture on Amazon EKS. The architecture provides significant resource savings and improved scalability compared to the monolithic approach, with full OAuth authentication via AWS Cognito.
 
+## What is MCP Gateway & Registry?
+
+**Model Context Protocol (MCP)** is an open standard protocol that allows AI Models to connect with external systems, tools, and data sources. While MCP simplifies tool access for Agents and solves data access and internal/external API connectivity challenges, several critical obstacles remain before enterprises can fully realize MCP's promise.
+
+### Discovery & Access Challenges:
+
+- **Service Discovery**: How do developers find and access approved MCP servers?
+- **Governed Access**: How do enterprises provide secure, centralized access to curated MCP servers?
+- **Tool Selection**: With hundreds of enterprise MCP servers, how do developers identify the right tools for their specific agents?
+- **Dynamic Discovery**: How can agents dynamically find and use new tools for tasks they weren't originally designed for?
+
+### The Solution
+
+The **MCP Gateway & Registry** solves these challenges by providing a unified platform that combines centralized access control with intelligent tool discovery. The Registry offers both visual and programmatic interfaces for exploring available MCP servers and tools, while the Gateway ensures secure, governed access to all services. This enables developers to programmatically build smarter agents and allows agents to autonomously discover and execute tools beyond their initial capabilities.
+
+### Architecture Overview
+
+The Gateway works by using an Nginx server as a reverse proxy, where each MCP server is handled as a different path and the Nginx reverse proxy sitting between the MCP clients (contained in AI Agents for example) and backend server forwards client requests to appropriate backend servers and returns the responses back to clients.
+
+An AI Agent written in any framework can connect to multiple MCP servers via this gateway, for example to access two MCP servers one called `weather`, and another one called `currenttime` - an agent would create an MCP client pointing to `https://my-mcp-gateway.enterprise.net/weather/` and another one pointing to `https://my-mcp-gateway.enterprise.net/currenttime/`. This technique supports both SSE and Streamable HTTP transports.
+
+### Key Features
+
+- **🔍 MCP Tool Discovery**: Enables automatic tool discovery by AI Agents and Agent developers. Fetches and displays the list of tools (name, description, schema) based on natural language queries (e.g. "do I have tools to get stock information?").
+- **🌐 Unified Access**: Access multiple MCP servers through a common MCP gateway, enabling AI Agents to dynamically discover and execute MCP tools.
+- **📋 Service Registration**: Register MCP services via JSON files or the web UI/API.
+- **🖥️ Web UI**: Manage services, view status, and monitor health through a web interface.
+- **🔐 Authentication**: Secure OAuth login system with AWS Cognito for web UI and API access.
+- **💚 Health Checks**: Periodic background checks for enabled services with real-time UI updates via WebSockets.
+- **⚙️ Dynamic Configuration**: Generates Nginx reverse proxy configuration based on registered services and their enabled/disabled state.
+- **🎨 UI Customization**: Dark/Light theme toggle and collapsible sidebar with state persistence.
+
 ## 🎉 Latest Updates
 
 - ✅ **OAuth Authentication**: Working in production with AWS Cognito hosted UI
